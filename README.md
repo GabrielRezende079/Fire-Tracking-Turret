@@ -35,4 +35,15 @@ O sistema detecta e rastreia o objeto (chama) na tela e movimenta os servos da t
 3. O Arduino converte as coordenadas em ângulos e move os servos da torreta para mirar no alvo.
 
 ---
+### Instalando as bibliotecas:
 
+```bash
+pip install ultralytics opencv-python pyserial numpy
+```
+
+## 📂 Estrutura do Projeto
+```
+├── face_tracker.py          # Rastreador de rosto usando OpenCV
+├── fire_tracker.py          # Rastreador de fogo usando YOLO
+├── Arduino_FaceFire_Tracker.ino  # Código Arduino
+```
