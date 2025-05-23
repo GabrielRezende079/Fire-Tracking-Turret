@@ -6,12 +6,14 @@ from ultralytics import YOLO
 
 arduinoData = serial.Serial('COM3', 9600)
 model = YOLO("C:/Users/Pichau/Documents/MeusProj/Fire-Tracking-Turret/Codes/runs/detect/train3/weights/best.pt")
-
 cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
-bomba_ligada = False
-ultimo_fogo_detectado = 0
-tempo_espera = 3  # segundos antes de desligar a bomba
+# Controle da bomba
+tempo_jato = 1  # segundos entre ON/OFF
+espera_para_ligar = 2  # segundos antes de começar a jatear
+inicio_fogo = None
+ultimo_jato = 0
+estado_bomba = False
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -22,12 +24,15 @@ while cap.isOpened():
     results = model(frame)
 
     fogo_detectado = False
+    tempo_atual = time.time()
 
     for r in results:
         boxes = r.boxes.xyxy
         if len(boxes) > 0:
             fogo_detectado = True
-            ultimo_fogo_detectado = time.time()  # atualiza o tempo do último fogo detectado
+
+            if inicio_fogo is None:
+                inicio_fogo = tempo_atual
 
             box = boxes[0]
             x1, y1, x2, y2 = map(int, box)
@@ -43,17 +48,23 @@ while cap.isOpened():
             cv2.circle(frame, (cx, cy), 5, (255, 0, 0), -1)
             cv2.putText(frame, f"{cx},{cy}", (cx+10, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-    tempo_desde_ultimo_fogo = time.time() - ultimo_fogo_detectado
-
-    if fogo_detectado and not bomba_ligada:
-        arduinoData.write("ON\r".encode())
-        bomba_ligada = True
-        print("Bomba LIGADA")
-
-    elif not fogo_detectado and bomba_ligada and tempo_desde_ultimo_fogo > tempo_espera:
-        arduinoData.write("OFF\r".encode())
-        bomba_ligada = False
-        print("Bomba DESLIGADA")
+    if fogo_detectado:
+        if tempo_atual - inicio_fogo >= espera_para_ligar:
+            if tempo_atual - ultimo_jato >= tempo_jato:
+                if estado_bomba:
+                    arduinoData.write("OFF\r".encode())
+                    print("Bomba DESLIGADA (intermitente)")
+                else:
+                    arduinoData.write("ON\r".encode())
+                    print("Bomba LIGADA (intermitente)")
+                estado_bomba = not estado_bomba
+                ultimo_jato = tempo_atual
+    else:
+        if estado_bomba:
+            arduinoData.write("OFF\r".encode())
+            print("Bomba DESLIGADA (fim da detecção)")
+        inicio_fogo = None
+        estado_bomba = False
 
     cv2.imshow("Fire Tracker", frame)
 
